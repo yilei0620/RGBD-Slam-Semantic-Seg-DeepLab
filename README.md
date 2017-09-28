@@ -20,10 +20,10 @@ Compilation of DeepLab is the same as compiling process as [Caffe](http://caffe.
 
 After install all of above packages, please copy `g2o` and `DeepLab` cmake file in to directory`slam_deeplab/cmake_modules/`. Then, compile the package by standard cmake process:
 
-`mkdir build`
-`cd build`
-`cmake ..`
-`make`
+`mkdir build
+cd build
+cmake ..
+make`
 
 
 ## Experiment

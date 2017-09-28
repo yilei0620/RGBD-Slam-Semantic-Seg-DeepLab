@@ -4,13 +4,13 @@ We implement common slam techniques to reconstruct the RGB-d mapping. Since the 
 
 ## Result
 The result of common technique of slam:
-![alt tag](1)
+![alt tag](https://github.com/yilei0620/Slam-Semantic-Seg-DeepLab/blob/master/slam_deepLab/result_slam.png)
 
 The result of method combined with deeplab:
-![alt tag](2)
+![alt tag](https://github.com/yilei0620/Slam-Semantic-Seg-DeepLab/blob/master/slam_deepLab/result_dp.png)
 
 The result of technique using deep learning method is heavily based on the accuracy of machine learning model. For example, here we can see that we can't remove all of person in the scene but we can remove his last configuration. This is because the DeepLab can recognize this person in the last one while for previous key frames, it can't because the patch of this person is too small.
-![alt tag](2)
+![alt tag](https://github.com/yilei0620/Slam-Semantic-Seg-DeepLab/blob/master/slam_deepLab/comparison.png)
 
 ## Installation
 
@@ -23,10 +23,13 @@ After install all of above packages, please copy `g2o` and `DeepLab` cmake file 
 `mkdir build`
 `cd build`
 `cmake ..`
-`make`s
+`make`
 
 
 ## Experiment
+RGB data should be stored in `./data/rgb_png/` and named as `1.png,2.png`. Depth data should be stored in `./data/depth_png/` and named as the same way of RGB images.
+
+`parameters.txt` is for setting parameters for both two methods. Detail please see the file.
 
 `bin/slam` is for common method.
 `bin/slamDP` is for learning based method.

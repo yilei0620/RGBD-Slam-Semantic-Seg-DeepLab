@@ -14,7 +14,7 @@ The result of technique using deep learning method is heavily based on the accur
 
 ## Installation
 
-The package is based on [OpenCV 3.3](http://opencv.org/opencv-3-3.html), [g2o](https://github.com/RainerKuemmerle/g2o) and [DeepLab-V2](https://bitbucket.org/aquariusjay/deeplab-public-ver2). The installation process can be found on those links. 
+The package is based on [OpenCV 3.3](http://opencv.org/opencv-3-3.html), [g2o](https://github.com/RainerKuemmerle/g2o) and [DeepLab-V2](https://bitbucket.org/aquariusjay/deeplab-public-ver2). The installation process can be found on those links. The DeepLab package supports CPU only devices (I correct the error when compiling CPU only mode and also change the number of outputs of `MemoryDataLayer` in order to run `CRF layer`).
 
 Compilation of DeepLab is the same as compiling process as [Caffe](http://caffe.berkeleyvision.org/). Please compile the deeplab package provided in the repository.
 

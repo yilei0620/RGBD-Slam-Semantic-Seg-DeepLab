@@ -11,6 +11,7 @@ The result of common technique of slam:
 The result of method combined with deeplab:
 ![alt tag](https://github.com/yilei0620/Slam-Semantic-Seg-DeepLab/blob/master/slam_deepLab/result_dp.png)
 
+## Failed Result
 The result of technique using deep learning method is heavily based on the accuracy of machine learning model. For example, here we can see that we can't remove all configurations of the person in the scene but we can remove his last configuration. This is because the DeepLab can't recognize this person when just a part of him that can be seen. In the future, we should try some better semantic segmentation model such as [DeepLab-V3](https://arxiv.org/abs/1706.05587) or [PsPNet](https://arxiv.org/abs/1612.01105).
 ![alt tag](https://github.com/yilei0620/Slam-Semantic-Seg-DeepLab/blob/master/slam_deepLab/failed_exp.png)
 

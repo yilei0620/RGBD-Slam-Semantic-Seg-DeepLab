@@ -3,14 +3,14 @@
 We implement common slam techniques to reconstruct the RGB-d mapping. Since the method can't deal with movable objects, we are trying to use semantic segmentation method to remove those objects during mapping (person, cat, car, bus ...). The semantic segmentation library used is [DeepLab-V2](https://bitbucket.org/aquariusjay/deeplab-public-ver2) [VGG-16](http://liangchiehchen.com/projects/DeepLabv2_vgg.html) based model. 
 
 ## Result
+The result of technique using deep learning method is heavily based on the accuracy of machine learning model. For example, here we can see that we can't remove all configurations of the person in the scene but we can remove his last configuration. This is because the DeepLab can recognize this person in the last one while for previous key frames, it can't because the patch of this person is too small.
+
 The result of common technique of slam:
 ![alt tag](https://github.com/yilei0620/Slam-Semantic-Seg-DeepLab/blob/master/slam_deepLab/result_slam.png)
 
 The result of method combined with deeplab:
 ![alt tag](https://github.com/yilei0620/Slam-Semantic-Seg-DeepLab/blob/master/slam_deepLab/result_dp.png)
 
-The result of technique using deep learning method is heavily based on the accuracy of machine learning model. For example, here we can see that we can't remove all configurations of the person in the scene but we can remove his last configuration. This is because the DeepLab can recognize this person in the last one while for previous key frames, it can't because the patch of this person is too small.
-![alt tag](https://github.com/yilei0620/Slam-Semantic-Seg-DeepLab/blob/master/slam_deepLab/comparison.png)
 
 ## Installation
 

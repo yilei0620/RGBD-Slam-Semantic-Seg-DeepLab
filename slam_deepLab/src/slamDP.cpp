@@ -105,6 +105,9 @@ int main(int argc, char** argv) {
   ParameterReader pd;
     int startIndex  =   atoi( pd.getData( "start_index" ).c_str() );
     int endIndex    =   atoi( pd.getData( "end_index"   ).c_str() );
+    vector<int> compression_params;
+    compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
+  compression_params.push_back(3);
 
     vector<FRAME > keyframes;
     // initialize smt
@@ -206,7 +209,7 @@ int main(int argc, char** argv) {
     pcl::VoxelGrid<PointT> voxel; // grid filter, estimate resolution
     pcl::PassThrough<PointT> pass; // z-filter, ignore points whose distance are too large
     pass.setFilterFieldName("z");
-    pass.setFilterLimits( 0.0, 6.0 ); //ignore 4 meters or further
+    pass.setFilterLimits( 0.0, 4.0 ); //ignore 4 meters or further
 
     double gridsize = atof( pd.getData( "voxel_grid" ).c_str() ); //find the resolution
     voxel.setLeafSize( gridsize, gridsize, gridsize );
@@ -234,6 +237,7 @@ int main(int argc, char** argv) {
        _net->ForwardPrefilled();                    // compute once                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
       layerData = _net->blob_by_name("crf_interp_argmax");
       Mask =  computerMask(layerData, data_dim[i].second, data_dim[i].first , Orig_H, Orig_W);
+      cv::imwrite("./data/seg/keyframe"+ to_string(i+1) + ".png", Mask,  compression_params);
         // pick up a frame from g2o
         g2o::VertexSE3* vertex = dynamic_cast<g2o::VertexSE3*>(globalOptimizer.vertex( keyframes[i].frameID ));
         Eigen::Isometry3d pose = vertex->estimate(); //the optimized position
@@ -421,7 +425,7 @@ cv::Mat computerMask(boost::shared_ptr<caffe::Blob<NetTy>>& layerData, int H, in
            pstart++;
          }
     }
-    cv::Mat Mask =  lab(cv::Rect(0,0,W,H));
+    cv::Mat Mask =  lab(cv::Rect(0,0,H,W));
     cv::resize(Mask,Mask,cv::Size(Orig_W,Orig_H));
     return Mask;
 }

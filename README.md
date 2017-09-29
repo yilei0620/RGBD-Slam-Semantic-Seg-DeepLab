@@ -3,13 +3,18 @@
 We implement common slam techniques to reconstruct the RGB-d mapping. Since the method can't deal with movable objects, we are trying to use semantic segmentation method to remove those objects during mapping (person, cat, car, bus ...). The semantic segmentation library used is [DeepLab-V2](https://bitbucket.org/aquariusjay/deeplab-public-ver2) [VGG-16](http://liangchiehchen.com/projects/DeepLabv2_vgg.html) based model. 
 
 ## Result
-The result of technique using deep learning method is heavily based on the accuracy of machine learning model. For example, here we can see that we can't remove all configurations of the person in the scene but we can remove his last configuration. This is because the DeepLab can recognize this person in the last one while for previous key frames, it can't because the patch of this person is too small.
+
 
 The result of common technique of slam:
 ![alt tag](https://github.com/yilei0620/Slam-Semantic-Seg-DeepLab/blob/master/slam_deepLab/result_slam.png)
 
 The result of method combined with deeplab:
 ![alt tag](https://github.com/yilei0620/Slam-Semantic-Seg-DeepLab/blob/master/slam_deepLab/result_dp.png)
+
+The result of technique using deep learning method is heavily based on the accuracy of machine learning model. For example, here we can see that we can't remove all configurations of the person in the scene but we can remove his last configuration. This is because the DeepLab can't recognize this person when just a part of him that can be seen. In the future, we should try some better semantic segmentation model such as [DeepLab-V3](https://arxiv.org/abs/1706.05587) or [PsPNet](https://arxiv.org/abs/1612.01105).
+![alt tag](https://github.com/yilei0620/Slam-Semantic-Seg-DeepLab/blob/master/slam_deepLab/failed_exp.png)
+
+We also can try real time semantic segmentation model such as [ICNet](https://arxiv.org/abs/1704.08545) to help with filtering movable objects' features in order to improve PnP RANSAC accuracy and efficiency.
 
 
 ## Installation

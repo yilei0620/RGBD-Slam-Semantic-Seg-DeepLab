@@ -1,10 +1,10 @@
-# 增加PCL库的依赖
+# Add PCL Lib		
 FIND_PACKAGE( PCL REQUIRED COMPONENTS common io visualization filters)
 
-# 增加opencv的依赖
+# Add OpenCV
 FIND_PACKAGE( OpenCV REQUIRED )
 
-# 添加头文件和库文件
+# Add heads and libs
 ADD_DEFINITIONS( ${PCL_DEFINITIONS} )
 INCLUDE_DIRECTORIES( ${PCL_INCLUDE_DIRS}  )
 LINK_LIBRARIES( ${PCL_LIBRARY_DIRS} )

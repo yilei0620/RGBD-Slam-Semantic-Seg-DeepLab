@@ -12,9 +12,9 @@ camera.scale=1000.0;
 start_index=1
 end_index=700
 
-rgb_dir=/home/lei/文档/slam/data/rgb_png/
+rgb_dir=./data/rgb_png/
 rgb_extension=.png
-depth_dir=/home/lei/文档/slam/data/depth_png/
+depth_dir=./data/depth_png/
 depth_extension=.png
 
 

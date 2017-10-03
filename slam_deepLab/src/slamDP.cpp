@@ -47,7 +47,7 @@ using namespace std;
 
 #define NetTy float 
 
-vector<pair<int, int>> preporcessKeyFrame(vector<FRAME>& keyframes);
+// vector<pair<int, int>> preporcessKeyFrame(vector<FRAME>& keyframes);
 
 FRAME readFrame( int index, ParameterReader& pd );
 // estimate the motion between 2 frames
@@ -66,7 +66,8 @@ void checkNearbyLoops( vector<FRAME>& frames, FRAME& currFrame, g2o::SparseOptim
 void checkRandomLoops( vector<FRAME>& frames, FRAME& currFrame, g2o::SparseOptimizer& opti );
 
 PointCloud::Ptr image2PointClouddeeplab( cv::Mat& rgb, cv::Mat& depth, CAMERA_INTRINSIC_PARAMETERS& camera, cv::Mat& Mask );
-cv::Mat computerMask(boost::shared_ptr<caffe::Blob<NetTy>>& layerData, int H, int W, int Orig_H, int Orig_W);
+
+cv::Mat computerMask(caffe::Net<NetTy>* _net, pair<cv::Mat,vector<int > >&  processedImg,  int Orig_H, int Orig_W);
 
 template <typename Dtype>
 caffe::Net<Dtype>* loadNet(std::string param_file, std::string pretrained_param_file, caffe::Phase phase)
@@ -77,23 +78,23 @@ caffe::Net<Dtype>* loadNet(std::string param_file, std::string pretrained_param_
     return net;
 }
 
-vector<pair<int, int>> preporcessKeyFrame(vector<FRAME>& keyframes){
-  FILE *stream;
-  vector<pair<int, int>>  data_dim; // first is W, second is H
-  vector<int> compression_params;
-  compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
-  compression_params.push_back(3);
-  stream = fopen("./data/temp/temp.txt","w+");
-  pair<cv::Mat,vector<int>>  processedImg;
-  for (int i = 0; i < keyframes.size(); i++){
-    fprintf(stream,"keyframe%d.png\n", i+1);
-    processedImg = imgpreprocess(keyframes[i].rgb);
-    cv::imwrite("./data/temp/keyframe"+ to_string(i+1) + ".png", processedImg.first, compression_params);
-    data_dim.push_back(pair<int, int> (processedImg.second[1], processedImg.second[0]) );
-  }
-  fclose(stream);
-  return data_dim;
-}
+// vector<pair<int, int>> preporcessKeyFrame(vector<FRAME>& keyframes){
+//   FILE *stream;
+//   vector<pair<int, int>>  data_dim; // first is W, second is H
+//   vector<int> compression_params;
+//   compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
+//   compression_params.push_back(3);
+//   stream = fopen("./data/temp/temp.txt","w+");
+//   pair<cv::Mat,vector<int>>  processedImg;
+//   for (int i = 0; i < keyframes.size(); i++){
+//     fprintf(stream,"keyframe%d.png\n", i+1);
+//     processedImg = imgpreprocess(keyframes[i].rgb);
+//     cv::imwrite("./data/temp/keyframe"+ to_string(i+1) + ".png", processedImg.first, compression_params);
+//     data_dim.push_back(pair<int, int> (processedImg.second[1], processedImg.second[0]) );
+//   }
+//   fclose(stream);
+//   return data_dim;
+// }
 
 
 
@@ -105,9 +106,6 @@ int main(int argc, char** argv) {
   ParameterReader pd;
     int startIndex  =   atoi( pd.getData( "start_index" ).c_str() );
     int endIndex    =   atoi( pd.getData( "end_index"   ).c_str() );
-    vector<int> compression_params;
-    compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
-  compression_params.push_back(3);
 
     vector<FRAME > keyframes;
     // initialize smt
@@ -199,7 +197,7 @@ int main(int argc, char** argv) {
     globalOptimizer.save( "./data/result_after.g2o" );
     cout<<"Optimization done."<<endl;
 
-    vector<pair<int, int>> data_dim = preporcessKeyFrame(keyframes);
+    // vector<pair<int, int>> data_dim = preporcessKeyFrame(keyframes);
 
      // point cloud joint
     cout<<"saving the point cloud map..."<<endl;
@@ -222,7 +220,6 @@ int main(int argc, char** argv) {
     string weights = "./model/train2_iter_20000.caffemodel";
 
   caffe::Net<NetTy>* _net = loadNet<NetTy>(model, weights, caffe::TEST); // load structure and weights
-  boost::shared_ptr<caffe::Blob<NetTy>> layerData;
   cout<<"loading weights completed!"<<endl;
 
    int Orig_W = 0, Orig_H = 0;
@@ -231,13 +228,15 @@ int main(int argc, char** argv) {
       Orig_H = keyframes[0].rgb.rows;
   }
   cv::Mat Mask;
+  pair<cv::Mat,vector<int>>  processedImg;
+
+
     for (size_t i=0; i<keyframes.size(); i++)
     {  
         // estimate mask
-       _net->ForwardPrefilled();                    // compute once                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
-      layerData = _net->blob_by_name("crf_interp_argmax");
-      Mask =  computerMask(layerData, data_dim[i].second, data_dim[i].first , Orig_H, Orig_W);
-      cv::imwrite("./data/seg/keyframe"+ to_string(i+1) + ".png", Mask,  compression_params);
+       processedImg = imgpreprocess(keyframes[i].rgb);             
+      Mask =  computerMask(_net, processedImg , Orig_H, Orig_W);
+      // cv::imwrite("./data/seg/keyframe"+ to_string(i+1) + ".png", Mask,  compression_params);
         // pick up a frame from g2o
         g2o::VertexSE3* vertex = dynamic_cast<g2o::VertexSE3*>(globalOptimizer.vertex( keyframes[i].frameID ));
         Eigen::Isometry3d pose = vertex->estimate(); //the optimized position
@@ -409,9 +408,21 @@ void checkRandomLoops( vector<FRAME>& frames, FRAME& currFrame, g2o::SparseOptim
     }
 }
 
-cv::Mat computerMask(boost::shared_ptr<caffe::Blob<NetTy>>& layerData, int H, int W, int Orig_H, int Orig_W){
+cv::Mat computerMask(caffe::Net<NetTy>* _net, pair<cv::Mat,vector<int > >&  processedImg,  int Orig_H, int Orig_W){
+  int aft_H = processedImg.second[1], aft_W = processedImg.second[0];
+  std::vector<cv::Mat> dv = { processedImg.first }; // We still need vectors as input
+  std::vector<int> label = { 0 };
+  std::vector<pair<int, int >  > dim = { pair<int, int> (aft_H,   aft_W) };
+  
+  caffe::MemoryDataLayer<NetTy> *m_layer_ = (caffe::MemoryDataLayer<NetTy> *)_net->layers()[0].get();
+  m_layer_->AddMatVector(dv, label, dim);
+
+  int end_ind = _net->layers().size();
+  std::vector<caffe::Blob<NetTy>*> input_vec;
+    _net->Forward(input_vec);
+  boost::shared_ptr<caffe::Blob<NetTy>> layerData = _net->blob_by_name("crf_interp_argmax");
+  const NetTy* pstart = layerData->cpu_data(); // layerData->cpu_data() returns a pointer to an array
   cv::Mat lab = cv::Mat::zeros(cv::Size(513,513),CV_32F);
-  const NetTy* pstart = layerData->cpu_data(); // res5_6->cpu_data()返回的是多维数据（数组）
   float tmp;
     for (int i = 0; i < 513; i++){
          for (int j = 0; j< 513; j++){
@@ -425,9 +436,9 @@ cv::Mat computerMask(boost::shared_ptr<caffe::Blob<NetTy>>& layerData, int H, in
            pstart++;
          }
     }
-    cv::Mat Mask =  lab(cv::Rect(0,0,H,W));
-    cv::resize(Mask,Mask,cv::Size(Orig_W,Orig_H));
-    return Mask;
+    lab = lab(cv::Rect(0,0, aft_W, aft_H));
+    cv::resize(lab,lab,cv::Size(Orig_W,Orig_H));
+    return lab;
 }
 
 PointCloud::Ptr image2PointClouddeeplab( cv::Mat& rgb, cv::Mat& depth, CAMERA_INTRINSIC_PARAMETERS& camera, cv::Mat& Mask ){

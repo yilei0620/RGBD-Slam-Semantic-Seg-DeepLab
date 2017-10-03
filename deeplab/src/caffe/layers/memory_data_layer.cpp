@@ -61,7 +61,7 @@ void MemoryDataLayer<Dtype>::AddDatumVector(const vector<Datum>& datum_vector) {
 #ifdef USE_OPENCV
 template <typename Dtype>
 void MemoryDataLayer<Dtype>::AddMatVector(const vector<cv::Mat>& mat_vector,
-    const vector<int>& labels, const vector<cv::Mat>& dim_vector) {
+    const vector<int>& labels, const vector<pair<int, int > >& dim_vector) {
   size_t num = mat_vector.size();
   CHECK(!has_new_data_) <<
       "Can't add mat until current data has been consumed.";
@@ -75,12 +75,14 @@ void MemoryDataLayer<Dtype>::AddMatVector(const vector<cv::Mat>& mat_vector,
   this->data_transformer_->Transform(mat_vector, &added_data_);
   // Copy Labels
   Dtype* top_label = added_label_.mutable_cpu_data();
+  Dtype* top_datadim = added_datadim_.mutable_cpu_data();
   for (int item_id = 0; item_id < num; ++item_id) {
     top_label[item_id] = labels[item_id];
+    top_datadim[item_id * 2] = dim_vector[item_id].first;
+    top_datadim[item_id * 2 + 1] = dim_vector[item_id].second;
   }
   // num_images == batch_size_
   Dtype* top_data = added_data_.mutable_cpu_data();
-  Dtype* top_datadim = added_datadim_.mutable_cpu_data();
   Reset(top_data, top_label, top_datadim, num);
   has_new_data_ = true;
 }

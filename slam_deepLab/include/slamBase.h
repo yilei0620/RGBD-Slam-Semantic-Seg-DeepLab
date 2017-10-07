@@ -13,6 +13,7 @@ using namespace std;
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/xfeatures2d.hpp>
+#include <opencv2/features2d.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 
@@ -36,44 +37,44 @@ using namespace std;
 typedef pcl::PointXYZRGBA PointT;
 typedef pcl::PointCloud<PointT> PointCloud;
 
-// 相机内参结构
+// cameara parameters
 struct CAMERA_INTRINSIC_PARAMETERS 
 { 
     double cx, cy, fx, fy, scale;
 };
 
-// image2PonitCloud 将rgb图转换为点云
+// image2PonitCloud
 PointCloud::Ptr image2PointCloud( cv::Mat& rgb, cv::Mat& depth, CAMERA_INTRINSIC_PARAMETERS& camera );
 
-// point2dTo3d 将单个点从图像坐标转换为空间坐标
-// input: 3维点Point3f (u,v,d)
+// point2dTo3d 
+// input: 3d point (float) Point3f
 cv::Point3f point2dTo3d( cv::Point3f& point, CAMERA_INTRINSIC_PARAMETERS& camera );
 
-// 帧结构
+
 struct FRAME
 {
     int frameID;
-    cv::Mat rgb, depth; //该帧对应的彩色图与深度图
-    cv::Mat desp;       //特征描述子
-    vector<cv::KeyPoint> kp; //关键点
+    cv::Mat rgb, depth; 
+    cv::Mat desp;       
+    vector<cv::KeyPoint> kp; 
 };
 
-// PnP 结果
+// PnP result
 struct RESULT_OF_PNP
 {
     cv::Mat rvec, tvec;
     int inliers;
 };
 
-// computeKeyPointsAndDesp 同时提取关键点与特征描述子
+// computeKeyPointsAndDesp: find key points and their corresponding descriptor
 void computeKeyPointsAndDesp( FRAME& frame, string detector );
 
-// estimateMotion 计算两个帧之间的运动
-// 输入：帧1和帧2, 相机内参
+// estimateMotion : measure the motion between 2 frames
+// 
 RESULT_OF_PNP estimateMotion( FRAME& frame1, FRAME& frame2, CAMERA_INTRINSIC_PARAMETERS& camera );
 
 
-// 参数读取类
+// read parameters
 class ParameterReader
 {
 public:

@@ -1,24 +1,14 @@
-// #define CPU_ONLY = 1;
+#include <iostream>
+#include <fstream>
+#include <sstream>
+using namespace std;
+
+#include <pcl/filters/passthrough.h>
 
 
-// #include <caffe/net.hpp>
-
-#include <g2o/types/slam3d/types_slam3d.h>
-#include <g2o/core/sparse_optimizer.h>
-#include <g2o/core/block_solver.h>
-#include <g2o/core/factory.h>
-#include <g2o/core/optimization_algorithm_factory.h>
-#include <g2o/core/optimization_algorithm_gauss_newton.h>
-#include <g2o/core/robust_kernel.h>
-#include <g2o/core/robust_kernel_factory.h>
-#include <g2o/core/optimization_algorithm_levenberg.h>
-#include <g2o/solvers/csparse/linear_solver_csparse.h>
-#include <g2o/core/robust_kernel_impl.h>
-
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/opencv.hpp>
+#include "slamBase.h"
+#include "ceres/ceres.h"
+#include "ceresbase.h"
 
 #include <caffe/caffe.hpp>
 #include <boost/algorithm/string.hpp>
@@ -30,41 +20,29 @@
 #include <caffe/util/io.hpp>
 #include <caffe/layers/memory_data_layer.hpp>
 
-#include <iostream>
-#include <algorithm>
-#include <iosfwd>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <stdio.h>  
-#include <stdlib.h>  
-#include "slamBase.h"
-#include <pcl/filters/passthrough.h>
-
-using namespace std;
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/opencv.hpp>
 
 #define NetTy float 
 
-// vector<pair<int, int>> preporcessKeyFrame(vector<FRAME>& keyframes);
-
+// Input an index，read corresponding frame
 FRAME readFrame( int index, ParameterReader& pd );
 // estimate the motion between 2 frames
 double normofTransform( cv::Mat rvec, cv::Mat tvec );
 
-typedef g2o::BlockSolver< g2o::BlockSolverTraits<6, 3> >  SlamBlockSolver;
-typedef g2o::LinearSolverCSparse<SlamBlockSolver::PoseMatrixType> SlamLinearSolver ;
-
 // Judge the relation between 2 frams
 enum CHECK_RESULT {NOT_MATCHED=0, TOO_FAR_AWAY, TOO_CLOSE, KEYFRAME}; 
 // Judge the relation between 2 frams
-CHECK_RESULT checkKeyframes( FRAME& f1, FRAME& f2, g2o::SparseOptimizer& opti, bool is_loops=false );
+CHECK_RESULT checkKeyframes( FRAME& f1, FRAME& f2, ceres::examples::MapOfPoses* poses,
+            ceres::examples::VectorOfConstraints* constraints , bool is_loops=false );
 //  check nearby loops
-void checkNearbyLoops( vector<FRAME>& frames, FRAME& currFrame, g2o::SparseOptimizer& opti );
+void checkNearbyLoops( vector<FRAME>& frames, FRAME& currFrame,  ceres::examples::MapOfPoses* poses,
+            ceres::examples::VectorOfConstraints* constraints );
 // check random loops
-void checkRandomLoops( vector<FRAME>& frames, FRAME& currFrame, g2o::SparseOptimizer& opti );
-
+void checkRandomLoops( vector<FRAME>& frames, FRAME& currFrame, ceres::examples::MapOfPoses* poses,
+            ceres::examples::VectorOfConstraints* constraints );
 PointCloud::Ptr image2PointClouddeeplab( cv::Mat& rgb, cv::Mat& depth, CAMERA_INTRINSIC_PARAMETERS& camera, cv::Mat& Mask );
 
 cv::Mat computerMask(caffe::Net<NetTy>* _net, pair<cv::Mat,vector<int > >&  processedImg,  int Orig_H, int Orig_W);
@@ -78,32 +56,11 @@ caffe::Net<Dtype>* loadNet(std::string param_file, std::string pretrained_param_
     return net;
 }
 
-// vector<pair<int, int>> preporcessKeyFrame(vector<FRAME>& keyframes){
-//   FILE *stream;
-//   vector<pair<int, int>>  data_dim; // first is W, second is H
-//   vector<int> compression_params;
-//   compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
-//   compression_params.push_back(3);
-//   stream = fopen("./data/temp/temp.txt","w+");
-//   pair<cv::Mat,vector<int>>  processedImg;
-//   for (int i = 0; i < keyframes.size(); i++){
-//     fprintf(stream,"keyframe%d.png\n", i+1);
-//     processedImg = imgpreprocess(keyframes[i].rgb);
-//     cv::imwrite("./data/temp/keyframe"+ to_string(i+1) + ".png", processedImg.first, compression_params);
-//     data_dim.push_back(pair<int, int> (processedImg.second[1], processedImg.second[0]) );
-//   }
-//   fclose(stream);
-//   return data_dim;
-// }
 
+int main( int argc, char** argv )
+{
 
-
-
-
-
-int main(int argc, char** argv) {
-
-  ParameterReader pd;
+    ParameterReader pd;
     int startIndex  =   atoi( pd.getData( "start_index" ).c_str() );
     int endIndex    =   atoi( pd.getData( "end_index"   ).c_str() );
 
@@ -117,35 +74,17 @@ int main(int argc, char** argv) {
 
     CAMERA_INTRINSIC_PARAMETERS camera = getDefaultCamera();
     computeKeyPointsAndDesp( currFrame, detector );
-    PointCloud::Ptr cloud = image2PointCloud( currFrame.rgb, currFrame.depth, camera );
-    
-
-    // whether show point cloud
-    bool visualize = pd.getData("visualize_pointcloud")==string("yes");
     
     /******************************* 
-    // g2o initialization
+    // ceres initialization
     *******************************/
+   ceres::examples::MapOfPoses poses;
+   ceres::examples::VectorOfConstraints constraints;
 
 
     // initialize optimizer
-    g2o::SparseOptimizer globalOptimizer; 
-    auto linearSolver  = g2o::make_unique<SlamLinearSolver>();
-    linearSolver->setBlockOrdering(false);
-
-    g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg( g2o::make_unique<SlamBlockSolver>(std::move(linearSolver)) );
-
-
-    globalOptimizer.setAlgorithm( solver ); 
-    globalOptimizer.setVerbose( false );
-
     //  Add 1st vertex to optimizer
-    g2o::VertexSE3* v = new g2o::VertexSE3();
-    v->setId( currIndex );
-    v->setEstimate( Eigen::Isometry3d::Identity() ); // suppose it is an identity matrix
-    v->setFixed( true ); //fix the 1st vertex
-    globalOptimizer.addVertex( v );
-
+   AddVertex(currIndex, Eigen::Vector3d(0,0,0), Eigen::Quaterniond(1, 0 , 0, 0),  &poses);
     keyframes.push_back( currFrame );
 
     double keyframe_threshold = atof( pd.getData("keyframe_threshold").c_str() );
@@ -157,7 +96,7 @@ int main(int argc, char** argv) {
         FRAME currFrame = readFrame( currIndex,pd ); 
         computeKeyPointsAndDesp( currFrame, detector );
         // compare currFrame and last key Frame
-        CHECK_RESULT result = checkKeyframes( keyframes.back(), currFrame, globalOptimizer ); 
+        CHECK_RESULT result = checkKeyframes( keyframes.back(), currFrame, &poses, &constraints  ); 
 
         switch (result){
         case NOT_MATCHED:
@@ -176,8 +115,8 @@ int main(int argc, char** argv) {
             // if it is a key frame, check loops
             if (check_loop_closure)
                 {
-                    checkNearbyLoops( keyframes, currFrame, globalOptimizer );
-                    checkRandomLoops( keyframes, currFrame, globalOptimizer );
+                    checkNearbyLoops( keyframes, currFrame, &poses, &constraints  );
+                    checkRandomLoops( keyframes, currFrame, &poses, &constraints  );
                 }
                 keyframes.push_back( currFrame );
                 break;
@@ -186,18 +125,20 @@ int main(int argc, char** argv) {
                 break;
             }
         
- 
     }
 
     // global optimization
-    cout<<"optimizing pose graph, vertices: "<<globalOptimizer.vertices().size()<<endl;
-    globalOptimizer.save("./data/result_before.g2o");
-    globalOptimizer.initializeOptimization();
-    globalOptimizer.optimize( 100 ); //可以指定优化步数
-    globalOptimizer.save( "./data/result_after.g2o" );
-    cout<<"Optimization done."<<endl;
 
-    // vector<pair<int, int>> data_dim = preporcessKeyFrame(keyframes);
+   CHECK(ceres::examples::OutputPoses("./data/poses_original.txt", poses))
+      << "Error outputting to poses_original.txt";
+   ceres::Problem problem;
+  ceres::examples::BuildOptimizationProblem(constraints, &poses, &problem);
+  CHECK(ceres::examples::SolveOptimizationProblem(&problem))
+      << "The solve was not successful, exiting.";
+
+  CHECK(ceres::examples::OutputPoses("./data/poses_optimized.txt", poses))
+      << "Error outputting to poses_original.txt";
+
 
      // point cloud joint
     cout<<"saving the point cloud map..."<<endl;
@@ -207,16 +148,12 @@ int main(int argc, char** argv) {
     pcl::VoxelGrid<PointT> voxel; // grid filter, estimate resolution
     pcl::PassThrough<PointT> pass; // z-filter, ignore points whose distance are too large
     pass.setFilterFieldName("z");
-    pass.setFilterLimits( 0.0, 4.0 ); //ignore 4 meters or further
+    pass.setFilterLimits( 0.0, 6.0 ); //ignore 4 meters or further
 
     double gridsize = atof( pd.getData( "voxel_grid" ).c_str() ); //find the resolution
     voxel.setLeafSize( gridsize, gridsize, gridsize );
- ////////////////////////////
-/*
- Load deeplab model and initialize
-  */
-    /////////////////
-    string model = "./model/test.prototxt";
+
+     string model = "./model/test.prototxt";
     string weights = "./model/train2_iter_20000.caffemodel";
 
   caffe::Net<NetTy>* _net = loadNet<NetTy>(model, weights, caffe::TEST); // load structure and weights
@@ -230,16 +167,12 @@ int main(int argc, char** argv) {
   cv::Mat Mask;
   pair<cv::Mat,vector<int>>  processedImg;
 
-
+    Eigen::Matrix4d pose;
     for (size_t i=0; i<keyframes.size(); i++)
-    {  
-        // estimate mask
-       processedImg = imgpreprocess(keyframes[i].rgb);             
+    {
+        processedImg = imgpreprocess(keyframes[i].rgb);             
       Mask =  computerMask(_net, processedImg , Orig_H, Orig_W);
-      // cv::imwrite("./data/seg/keyframe"+ to_string(i+1) + ".png", Mask,  compression_params);
-        // pick up a frame from g2o
-        g2o::VertexSE3* vertex = dynamic_cast<g2o::VertexSE3*>(globalOptimizer.vertex( keyframes[i].frameID ));
-        Eigen::Isometry3d pose = vertex->estimate(); //the optimized position
+        pose = ReadOptimizedPose(keyframes[i].frameID,  poses );
         PointCloud::Ptr newCloud = image2PointClouddeeplab( keyframes[i].rgb, keyframes[i].depth, camera, Mask ); //transfer it to point cloud
         // filter
         voxel.setInputCloud( newCloud );
@@ -247,7 +180,7 @@ int main(int argc, char** argv) {
         pass.setInputCloud( tmp );
         pass.filter( *newCloud );
         // join point cloud
-        pcl::transformPointCloud( *newCloud, *tmp, pose.matrix() );
+        pcl::transformPointCloud( *newCloud, *tmp, pose);
         *output += *tmp;
         tmp->clear();
         newCloud->clear();
@@ -257,15 +190,11 @@ int main(int argc, char** argv) {
     voxel.filter( *tmp );
     //store
     pcl::io::savePCDFile( "./result.pcd", *tmp );
-    globalOptimizer.clear();
     
     cout<<"Final map is saved."<<endl;
     return 0;
-
-  }
-
-
-
+    
+}
 
 FRAME readFrame( int index, ParameterReader& pd )
 {
@@ -297,7 +226,8 @@ double normofTransform( cv::Mat rvec, cv::Mat tvec )
     return fabs(min(cv::norm(rvec), 2*M_PI-cv::norm(rvec)))+ fabs(cv::norm(tvec));
 }
 
-CHECK_RESULT checkKeyframes( FRAME& f1, FRAME& f2, g2o::SparseOptimizer& opti, bool is_loops)
+CHECK_RESULT checkKeyframes( FRAME& f1, FRAME& f2,  ceres::examples::MapOfPoses* poses,
+            ceres::examples::VectorOfConstraints* constraints, bool is_loops)
 {
     static ParameterReader pd;
     static int min_inliers = atoi( pd.getData("min_inliers").c_str() );
@@ -305,11 +235,11 @@ CHECK_RESULT checkKeyframes( FRAME& f1, FRAME& f2, g2o::SparseOptimizer& opti, b
     static double keyframe_threshold = atof( pd.getData("keyframe_threshold").c_str() );
     static double max_norm_lp = atof( pd.getData("max_norm_lp").c_str() );
     static CAMERA_INTRINSIC_PARAMETERS camera = getDefaultCamera();
-    // 比较f1 和 f2
+    // compare f1 and f2
     RESULT_OF_PNP result = estimateMotion( f1, f2, camera );
-    if ( result.inliers < min_inliers ) //inliers不够，放弃该帧
+    if ( result.inliers < min_inliers )  //not enough inliers and give up this frame
         return NOT_MATCHED;
-    // 计算运动范围是否太大
+    // measure the motion
     double norm = normofTransform(result.rvec, result.tvec);
     if ( is_loops == false )
     {
@@ -324,52 +254,41 @@ CHECK_RESULT checkKeyframes( FRAME& f1, FRAME& f2, g2o::SparseOptimizer& opti, b
 
     if ( norm <= keyframe_threshold )
         return TOO_CLOSE;   // too adjacent frame
-    // 向g2o中增加这个顶点与上一帧联系的边
-    // 顶点部分
-    // 顶点只需设定id即可
+    // set vertex
     if (is_loops == false)
     {
-        g2o::VertexSE3 *v = new g2o::VertexSE3();
-        v->setId( f2.frameID );
-        v->setEstimate( Eigen::Isometry3d::Identity() );
-        opti.addVertex(v);
+        AddVertex(f2.frameID, Eigen::Vector3d(0,0,0), Eigen::Quaterniond(1, 0 , 0, 0),  poses);
     }
-    // 边部分
-    g2o::EdgeSE3* edge = new g2o::EdgeSE3();
-    // 连接此边的两个顶点id
-    edge->setVertex( 0, opti.vertex(f1.frameID ));
-    edge->setVertex( 1, opti.vertex(f2.frameID ));
-    edge->setRobustKernel( new g2o::RobustKernelHuber() );
-    // 信息矩阵
+    // set edge
     Eigen::Matrix<double, 6, 6> information = Eigen::Matrix< double, 6,6 >::Identity();
-    // 信息矩阵是协方差矩阵的逆，表示我们对边的精度的预先估计
-    // 因为pose为6D的，信息矩阵是6*6的阵，假设位置和角度的估计精度均为0.1且互相独立
-    // 那么协方差则为对角为0.01的矩阵，信息阵则为100的矩阵
+    // information matrix 6*6
     information(0,0) = information(1,1) = information(2,2) = 100;
     information(3,3) = information(4,4) = information(5,5) = 100;
-    // 也可以将角度设大一些，表示对角度的估计更加准确
-    edge->setInformation( information );
-    // 边的估计即是pnp求解之结果
     Eigen::Isometry3d T = cvMat2Eigen( result.rvec, result.tvec );
-    // edge->setMeasurement( T );
-    edge->setMeasurement( T.inverse() );
-    // 将此边加入图中
-    opti.addEdge(edge);
+    T = T.inverse() * Eigen::Isometry3d::Identity() ;
+    Eigen::Matrix3d rotation_matrix;
+     rotation_matrix << T(0,0) , T(0,1) , T(0,2) ,
+                                    T(1,0) , T(1,1) , T(1,2),
+                                    T(2,0) , T(2,1) , T(2,2);
+    Eigen::Quaterniond Q = Eigen::Quaterniond( rotation_matrix );
+    AddEgde( f1.frameID,  f2.frameID  ,  Eigen::Vector3d( T(0,3),  T(1,3) ,   T(2,3) ) , Q,  information,  constraints );
+
     return KEYFRAME;
 }
 
-void checkNearbyLoops( vector<FRAME>& frames, FRAME& currFrame, g2o::SparseOptimizer& opti )
+void checkNearbyLoops( vector<FRAME>& frames, FRAME& currFrame, ceres::examples::MapOfPoses* poses,
+            ceres::examples::VectorOfConstraints* constraints)
 {
     static ParameterReader pd;
     static int nearby_loops = atoi( pd.getData("nearby_loops").c_str() );
     
-    // 就是把currFrame和 frames里末尾几个测一遍
+    //near loop checking
     if ( frames.size() <= nearby_loops )
     {
         // no enough keyframes, check everyone
         for (size_t i=0; i<frames.size(); i++)
         {
-            checkKeyframes( frames[i], currFrame, opti, true );
+            checkKeyframes( frames[i], currFrame,  poses, constraints, true );
         }
     }
     else
@@ -377,24 +296,25 @@ void checkNearbyLoops( vector<FRAME>& frames, FRAME& currFrame, g2o::SparseOptim
         // check the nearest ones
         for (size_t i = frames.size()-nearby_loops; i<frames.size(); i++)
         {
-            checkKeyframes( frames[i], currFrame, opti, true );
+            checkKeyframes( frames[i], currFrame, poses, constraints , true );
         }
     }
 }
 
-void checkRandomLoops( vector<FRAME>& frames, FRAME& currFrame, g2o::SparseOptimizer& opti )
+void checkRandomLoops( vector<FRAME>& frames, FRAME& currFrame, ceres::examples::MapOfPoses* poses,
+            ceres::examples::VectorOfConstraints* constraints )
 {
     static ParameterReader pd;
     static int random_loops = atoi( pd.getData("random_loops").c_str() );
     srand( (unsigned int) time(NULL) );
-    // 随机取一些帧进行检测
+    // random closure checking
     
     if ( frames.size() <= random_loops )
     {
         // no enough keyframes, check everyone
         for (size_t i=0; i<frames.size(); i++)
         {
-            checkKeyframes( frames[i], currFrame, opti, true );
+            checkKeyframes( frames[i], currFrame, poses, constraints , true );
         }
     }
     else
@@ -403,7 +323,7 @@ void checkRandomLoops( vector<FRAME>& frames, FRAME& currFrame, g2o::SparseOptim
         for (int i=0; i<random_loops; i++)
         {
             int index = rand()%frames.size();
-            checkKeyframes( frames[index], currFrame, opti, true );
+            checkKeyframes( frames[index], currFrame, poses, constraints , true );
         }
     }
 }
@@ -452,7 +372,7 @@ PointCloud::Ptr image2PointClouddeeplab( cv::Mat& rgb, cv::Mat& depth, CAMERA_IN
 
       p.z = double(d) /camera.scale;
       p.x = (c - camera.cx) * p.z / camera.fx;
-                 p.y = (r - camera.cy) * p.z / camera.fy;
+                 p.y =  (r - camera.cy) * p.z / camera.fy;
 
                  p.b = rgb.ptr<uchar> (r) [c * 3];
                  p.g = rgb.ptr<uchar> (r) [c * 3  + 1];

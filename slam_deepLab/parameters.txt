@@ -1,5 +1,5 @@
-detector=SIFT
-good_match_threshold=6
+detector=sift
+good_match_threshold=5
 
 # camera
 camera.cx=325.5;
@@ -9,8 +9,8 @@ camera.fy=519.0;
 camera.scale=1000.0;
 
 
-start_index=1
-end_index=700
+start_index= 200
+end_index=393
 
 rgb_dir=./data/rgb_png/
 rgb_extension=.png
@@ -29,7 +29,7 @@ min_good_match=10
 
 min_inliers=5
 
-max_norm=0.3
+max_norm=0.5
 
 keyframe_threshold=0.1
 max_norm_lp=5.0

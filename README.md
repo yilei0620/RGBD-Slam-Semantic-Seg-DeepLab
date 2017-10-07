@@ -26,10 +26,10 @@ Compilation of DeepLab is the same as compiling process as [Caffe](http://caffe.
 
 After install all of above packages, please copy `Ceres` and `DeepLab` cmake file in to directory`slam_deeplab/cmake_modules/`. Then, compile the package by standard cmake process:
 
-`mkdir build\n
-cd build\n
-cmake ..\n
-make`\n
+`mkdir build
+cd build
+cmake ..
+make`
 
 The package was tested on Ubuntu 14.04 and 16.04.
 When compiling in the Ubuntu 16.04, please edit `src/Cmakelist.txt`. Details please see the file.

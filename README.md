@@ -24,7 +24,7 @@ The package is based on [OpenCV 3.3](http://opencv.org/opencv-3-3.html), [Ceres]
 
 Compilation of DeepLab is the same as compiling process as [Caffe](http://caffe.berkeleyvision.org/). Please compile the deeplab package provided in the repository.
 
-After install all of above packages, please copy `Ceres` and `DeepLab` cmake file in to directory`slam_deeplab/cmake_modules/`. Then, compile the package by standard cmake process:
+After install all of above packages, please copy `Ceres` and `DeepLab` cmake files (which should be in the path as `/ceres_solver/cmake/` ) in to directory`slam_deeplab/cmake_modules/`. Then, compile the package by standard cmake process:
 
 `mkdir build
 cd build
